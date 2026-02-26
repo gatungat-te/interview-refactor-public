@@ -18,6 +18,6 @@ public class BillingCoordinator {
     }
 
     public void flagOverage(String customerId, int overageUnits) {
-        billingService.generateMonthlyInvoice(customerId);
+        billingService.generateMonthlyInvoice(customerId, overageUnits);
     }
 }

@@ -31,16 +31,19 @@ public class BillingService {
         this.invoiceRepository = invoiceRepository;
     }
 
-    public Invoice generateMonthlyInvoice(String customerId) {
+    public Invoice generateMonthlyInvoice(String customerId, int overageUnits) {
         Customer customer = customerRepository.findById(customerId);
         Usage usage = usageService.loadUsage(customerId, LocalDate.now().minusMonths(1));
+        UsageMetric overage = new UsageMetric("overagen", overageUnits);
+        var totalMetrics = new ArrayList<>(usage.metrics());
+        totalMetrics.add(overage);
         String plan = accountPlatform.fetchPlan(customerId);
         BigDecimal discount = accountPlatform.lookupDiscount(customerId, plan);
 
         List<LineItem> lineItems = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
 
-        for (UsageMetric metric : usage.metrics()) {
+        for (UsageMetric metric : totalMetrics) {
             BigDecimal unitPrice = accountPlatform.lookupUnitPrice(plan, metric.name());
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(metric.quantity()));
             lineItems.add(new LineItem(metric.name(), metric.quantity(), unitPrice, lineTotal));
@@ -49,7 +52,7 @@ public class BillingService {
 
         BigDecimal discountedTotal = subtotal.subtract(discount).max(BigDecimal.ZERO);
         BigDecimal tax = discountedTotal.multiply(BigDecimal.valueOf(customer.taxRate()))
-                .setScale(2, RoundingMode.HALF_UP);
+                                        .setScale(2, RoundingMode.HALF_UP);
         BigDecimal total = discountedTotal.add(tax);
 
         Invoice invoice = new Invoice(
@@ -71,6 +74,9 @@ public class BillingService {
         }
 
         return invoice;
+    }
+    public Invoice generateMonthlyInvoice(String customerId) {
+        return generateMonthlyInvoice(customerId, 0);
     }
 
     public String lastInvoiceId(String customerId) {
